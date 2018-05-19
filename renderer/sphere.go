@@ -6,32 +6,20 @@ type Sphere struct {
 	center       Vector3
 	radius       float64
 	radiusSquare float64
-	color        Vector3
-	reflectivity float64
-	transparency float64
+	material     Material
 }
 
-func CreateSphere(center Vector3, radius float64, color Vector3, reflectivity float64, transparency float64) Sphere {
+func CreateSphere(center Vector3, radius float64, material Material) Sphere {
 	return Sphere{
 		center:       center,
 		radius:       radius,
 		radiusSquare: radius * radius,
-		color:        color,
-		reflectivity: reflectivity,
-		transparency: transparency,
+		material:     material,
 	}
 }
 
-func (s Sphere) Color() Vector3 {
-	return s.color
-}
-
-func (s Sphere) Transparency() float64 {
-	return s.transparency
-}
-
-func (s Sphere) Reflectivity() float64 {
-	return s.reflectivity
+func (s Sphere) Material() Material {
+	return s.material
 }
 
 func (s Sphere) Intersects(r Ray) Hit {
