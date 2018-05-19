@@ -9,8 +9,8 @@ func main() {
 	var lights []renderer.Light
 
 	options := renderer.RenderingOptions{
-		Width:    1024,
-		Height:   768,
+		Width:    800,
+		Height:   600,
 		Fov:      60,
 		MaxDepth: 5,
 	}
