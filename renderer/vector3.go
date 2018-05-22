@@ -41,6 +41,10 @@ func (v Vector3) Dot(v2 Vector3) float64 {
 	return v.X*v2.X + v.Y*v2.Y + v.Z*v2.Z
 }
 
+func (v Vector3) Cross(v2 Vector3) Vector3 {
+	return NewVector3(v.Y*v2.Z-v.Z*v2.Y, v.Z*v2.X-v.X*v2.Z, v.X*v2.Y-v.Y*v2.X)
+}
+
 func (v1 Vector3) DistanceTo(v2 Vector3) float64 {
 	a := v1.X - v2.X
 	b := v1.Y - v2.Y

@@ -12,8 +12,11 @@ func main() {
 		MaxDepth: 5,
 	}
 
-	//r.Render(options, createCornellBoxScene())
-	r.Render(options, createTestScene1())
+	sampler := r.PathTracer{}
+	//sampler := r.RayTracer{}
+
+	r.Render(sampler, options, createCornellBoxScene())
+	//r.Render(sampler, options, createTestScene1())
 }
 
 func createCornellBoxScene() r.Scene {
@@ -23,7 +26,7 @@ func createCornellBoxScene() r.Scene {
 	frontWallMaterial := r.NewMaterial(r.NewVector3(0, 1, 0), 0, 0)
 
 	mirrorMaterial := r.NewMaterial(r.NewVector3(.9999, .9999, .9999), 1, 0)
-	glassMaterial := r.NewMaterial(r.NewVector3(.9999, .9999, .9999), 1, 0.5)
+	glassMaterial := r.NewMaterial(r.NewVector3(.9999, .9999, .9999), 1, 0)
 
 	const radius = 1e4
 	const offsetX = 100
