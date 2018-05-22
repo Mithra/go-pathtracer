@@ -20,13 +20,14 @@ func main() {
 }
 
 func createCornellBoxScene() r.Scene {
-	leftWallMaterial := r.NewMaterial(r.NewVector3(.75, .25, .25), 0, 0)
-	rightWallMaterial := r.NewMaterial(r.NewVector3(.25, .25, .75), 0, 0)
-	backWallMaterial := r.NewMaterial(r.NewVector3(.75, .75, .75), 0, 0)
-	frontWallMaterial := r.NewMaterial(r.NewVector3(0, 1, 0), 0, 0)
+	lightMaterial := r.NewMaterial(r.Vector3Zero, 0, 0, r.NewVector3(1, 1, 1).MulScalar(4))
+	leftWallMaterial := r.NewMaterial(r.NewVector3(.75, .25, .25), 0, 0, r.Vector3Zero)
+	rightWallMaterial := r.NewMaterial(r.NewVector3(.25, .25, .75), 0, 0, r.Vector3Zero)
+	backWallMaterial := r.NewMaterial(r.NewVector3(.75, .75, .75), 0, 0, r.Vector3Zero)
+	frontWallMaterial := r.NewMaterial(r.NewVector3(0, 1, 0), 0, 0, r.Vector3Zero)
 
-	mirrorMaterial := r.NewMaterial(r.NewVector3(.9999, .9999, .9999), 1, 0)
-	glassMaterial := r.NewMaterial(r.NewVector3(.9999, .9999, .9999), 1, 0)
+	mirrorMaterial := r.NewMaterial(r.NewVector3(.9999, .9999, .9999), 1, 0, r.Vector3Zero)
+	glassMaterial := r.NewMaterial(r.NewVector3(.9999, .9999, .9999), 1, 0, r.Vector3Zero)
 
 	const radius = 1e4
 	const offsetX = 100
@@ -43,6 +44,8 @@ func createCornellBoxScene() r.Scene {
 		r.CreateSphere(r.NewVector3(-50, -75, -offsetZ-250), 30, mirrorMaterial), // Sphere1
 		r.CreateSphere(r.NewVector3(50, -75, -offsetZ-200), 30, mirrorMaterial),  // Sphere2
 		r.CreateSphere(r.NewVector3(-15, -75, -offsetZ-190), 30, glassMaterial),  // Sphere3
+
+		r.CreateSphere(r.NewVector3(0, offsetX, -offsetZ-150), 30, lightMaterial), // Light
 	}
 
 	lights := []r.Light{

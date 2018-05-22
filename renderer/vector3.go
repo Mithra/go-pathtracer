@@ -72,3 +72,5 @@ func (v Vector3) Normalize() Vector3 {
 	}
 	return v
 }
+
+var Vector3Zero Vector3 = NewVector3(0, 0, 0)

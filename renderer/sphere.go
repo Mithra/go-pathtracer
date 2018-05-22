@@ -18,6 +18,10 @@ func CreateSphere(center Vector3, radius float64, material Material) Sphere {
 	}
 }
 
+func (s Sphere) Position() Vector3 {
+	return s.center
+}
+
 func (s Sphere) Material() Material {
 	return s.material
 }
