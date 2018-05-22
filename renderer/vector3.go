@@ -9,6 +9,10 @@ type Vector3 struct {
 	X, Y, Z float64
 }
 
+func NewVector3(x, y, z float64) Vector3 {
+	return Vector3{X: x, Y: y, Z: z}
+}
+
 func (v Vector3) String() string {
 	return fmt.Sprintf("(%0.24f, %0.24f, %0.24f)", v.X, v.Y, v.Z)
 }
@@ -35,6 +39,13 @@ func (v Vector3) Div(v2 Vector3) Vector3 {
 
 func (v Vector3) Dot(v2 Vector3) float64 {
 	return v.X*v2.X + v.Y*v2.Y + v.Z*v2.Z
+}
+
+func (v1 Vector3) DistanceTo(v2 Vector3) float64 {
+	a := v1.X - v2.X
+	b := v1.Y - v2.Y
+	c := v1.Z - v2.Z
+	return math.Sqrt(a*a + b*b + c*c)
 }
 
 func (v Vector3) LengthSquared() float64 {

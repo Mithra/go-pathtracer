@@ -64,10 +64,12 @@ func trace(ray Ray, scene Scene, depthLeft uint) Vector3 {
 	}
 
 	if (material.Transparency > 0.0 || material.Reflectivity > 0.0) && depthLeft > 0 {
-		facingRatio := -ray.Direction.Dot(nhit)
+		rayDotNormal := ray.Direction.Dot(nhit)
+
+		facingRatio := -rayDotNormal
 		fresnelEffect := mix(math.Pow(1-facingRatio, 3), 1, 0.1)
 
-		reflectionDir := ray.Direction.Sub(nhit.MulScalar(2 * ray.Direction.Dot(nhit))).Normalize()
+		reflectionDir := ray.Direction.Sub(nhit.MulScalar(2 * rayDotNormal)).Normalize()
 
 		reflectionRay := Ray{
 			Origin:    phit.Sub(nhit.MulScalar(bias)),
@@ -105,6 +107,7 @@ func trace(ray Ray, scene Scene, depthLeft uint) Vector3 {
 	} else {
 		for i := 0; i < len(scene.Lights); i++ {
 			light := scene.Lights[i]
+			lightDistance := phit.DistanceTo(light.Position)
 			lightDirection := light.Position.Sub(phit).Normalize()
 
 			lightRay := Ray{
@@ -121,7 +124,7 @@ func trace(ray Ray, scene Scene, depthLeft uint) Vector3 {
 				lightHit := scene.Objects[j].Intersects(lightRay)
 
 				// Object is blocking the light
-				if lightHit.Valid {
+				if lightHit.Valid && lightHit.Distance < lightDistance {
 					transmission = false
 					break
 				}
