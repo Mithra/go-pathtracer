@@ -2,6 +2,7 @@ package renderer
 
 import (
 	"math"
+	"math/rand"
 )
 
 const computeReflectionAndRefractions bool = true
@@ -9,7 +10,7 @@ const computeReflectionAndRefractions bool = true
 type RayTracer struct {
 }
 
-func (r RayTracer) Sample(x, y uint, camera Camera, scene Scene, options RenderingOptions) Vector3 {
+func (r RayTracer) Sample(x, y uint, camera Camera, scene Scene, options RenderingOptions, rnd *rand.Rand) Vector3 {
 	var aspectRatio = float64(options.Width) / float64(options.Height)
 	var angle = math.Tan(0.5 * options.Fov * math.Pi / 180.0)
 

@@ -3,20 +3,18 @@ package renderer
 import (
 	"math"
 	"math/rand"
-	"time"
 )
 
 type PathTracer struct {
 }
 
 var defaultColor Vector3 = NewVector3(0, 0, 0)
-var randomSource rand.Source = rand.NewSource(time.Now().Unix())
 
 var M_PI float64 = math.Pi
 var M_1_PI float64 = 1. / M_PI
-var nbSamples int = 2
+var nbSamples int = 4
 
-func (r PathTracer) Sample(x, y uint, camera Camera, scene Scene, options RenderingOptions) Vector3 {
+func (r PathTracer) Sample(x, y uint, camera Camera, scene Scene, options RenderingOptions, rnd *rand.Rand) Vector3 {
 	// See: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays
 	w := float64(options.Width)
 	h := float64(options.Height)
@@ -26,17 +24,15 @@ func (r PathTracer) Sample(x, y uint, camera Camera, scene Scene, options Render
 	aspectRatio := w / h
 	scale := math.Tan(0.5 * degToRad(options.Fov))
 
-	var randomSeed []uint = nil
-
 	pixelColor := NewVector3(0, 0, 0)
 	for sy := 0; sy < 2; sy++ {
 		for sx := 0; sx < 2; sx++ {
 			acc := NewVector3(0, 0, 0)
 			for subSample := 0; subSample < nbSamples; subSample++ {
-				r1 := 2. * erand48(randomSeed)
+				r1 := 2. * rand.Float64()
 				dx := ternaryFloat64(r1 < 1, math.Sqrt(r1)-1., 1.-math.Sqrt(2.-r1))
 
-				r2 := 2. * erand48(randomSeed)
+				r2 := 2. * rand.Float64()
 				dy := ternaryFloat64(r2 < 1, math.Sqrt(r2)-1., 1.-math.Sqrt(2.-r2))
 
 				// Normalized Device Coordinates ([0,1])
@@ -54,7 +50,7 @@ func (r PathTracer) Sample(x, y uint, camera Camera, scene Scene, options Render
 				pixelCameraSpace := camera.cameraToWorld.MultDirection(NewVector3(pixelCameraX, pixelCameraY, -1)).Normalize()
 
 				// Compute color for that pixel
-				radiance := r.radiance(NewRay(cam.Origin, pixelCameraSpace), scene, options, 0, randomSeed, 1)
+				radiance := r.radiance(NewRay(cam.Origin, pixelCameraSpace), scene, options, 0, rnd, 1)
 				acc = acc.Add(radiance.MulScalar(1. / float64(nbSamples)))
 			}
 
@@ -96,7 +92,7 @@ func (r PathTracer) intersect(ray Ray, scene Scene, ignoreLights bool) (hit Hit,
 	return nearestHit, collisionIndex
 }
 
-func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, depth uint, randomSeed []uint, E float64) Vector3 {
+func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, depth uint, rnd *rand.Rand, E float64) Vector3 {
 	depth = depth + 1
 
 	// We don't want to draw the light spheres
@@ -136,7 +132,7 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 	}
 
 	if depth > 5 || p == 0 {
-		if erand48(randomSeed) < p {
+		if rand.Float64() < p {
 			objectColor = objectColor.MulScalar(1 / p)
 		} else {
 			return material.EmissionColor.MulScalar(E)
@@ -145,8 +141,8 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 
 	// Pure diffuse material
 	if material.Reflectivity == 0 && material.Transparency == 0 {
-		r1 := 2. * M_PI * erand48(randomSeed)
-		r2 := erand48(randomSeed)
+		r1 := 2. * M_PI * rand.Float64()
+		r2 := rand.Float64()
 		r2s := math.Sqrt(r2)
 
 		// Create orthonormal coordinate frame (w,u,v)
@@ -188,8 +184,8 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 			rad := 1.5 // TODO: ?
 
 			cos_a_max := math.Sqrt(1 - (rad*rad)/p.Dot(p))
-			eps1 := erand48(randomSeed)
-			eps2 := erand48(randomSeed)
+			eps1 := rand.Float64()
+			eps2 := rand.Float64()
 			cos_a := 1 - eps1 + eps1*cos_a_max
 			sin_a := math.Sqrt(1 - cos_a*cos_a)
 			phi := 2 * M_PI * eps2
@@ -213,7 +209,7 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 
 		return material.EmissionColor.MulScalar(E).
 			Add(e).
-			Add(objectColor.Mul(r.radiance(NewRay(phit, d), scene, options, depth, randomSeed, 0)))
+			Add(objectColor.Mul(r.radiance(NewRay(phit, d), scene, options, depth, rnd, 0)))
 	}
 
 	reflectionDirection := ray.Direction.Sub(nhit.MulScalar(2 * nhit.Dot(ray.Direction)))
@@ -222,7 +218,7 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 	// Specular reflection
 	if material.Transparency == 0 {
 		return material.EmissionColor.
-			Add(objectColor.Mul(r.radiance(reflectionRay, scene, options, depth, randomSeed, 1)))
+			Add(objectColor.Mul(r.radiance(reflectionRay, scene, options, depth, rnd, 1)))
 	}
 
 	// Reflection + Refraction (dielectric (glass))
@@ -236,7 +232,7 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 	// Total internal reflection
 	if cost2t < 0 {
 		return material.EmissionColor.
-			Add(objectColor.Mul(r.radiance(reflectionRay, scene, options, depth, randomSeed, 1)))
+			Add(objectColor.Mul(r.radiance(reflectionRay, scene, options, depth, rnd, 1)))
 	}
 
 	// Choose reflection or refraction
@@ -260,22 +256,18 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 	colorDelta := Vector3Zero
 	if depth > 2 {
 		// Russian Roulette
-		if erand48(randomSeed) < P {
-			colorDelta = r.radiance(reflectionRay, scene, options, depth, randomSeed, 1).MulScalar(RP)
+		if rand.Float64() < P {
+			colorDelta = r.radiance(reflectionRay, scene, options, depth, rnd, 1).MulScalar(RP)
 		} else {
-			colorDelta = r.radiance(NewRay(phit, tdir), scene, options, depth, randomSeed, 1).MulScalar(TP)
+			colorDelta = r.radiance(NewRay(phit, tdir), scene, options, depth, rnd, 1).MulScalar(TP)
 		}
 	} else {
-		c1 := r.radiance(reflectionRay, scene, options, depth, randomSeed, 1).MulScalar(Re)
-		c2 := r.radiance(NewRay(phit, tdir), scene, options, depth, randomSeed, 1).MulScalar(Tr)
+		c1 := r.radiance(reflectionRay, scene, options, depth, rnd, 1).MulScalar(Re)
+		c2 := r.radiance(NewRay(phit, tdir), scene, options, depth, rnd, 1).MulScalar(Tr)
 		colorDelta = c1.Add(c2)
 	}
 
 	return material.EmissionColor.Add(material.Color.Mul(colorDelta))
-}
-
-func erand48(seed []uint) float64 {
-	return rand.Float64()
 }
 
 func clamp(x float64) float64 {

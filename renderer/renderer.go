@@ -5,8 +5,10 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"math/rand"
 	"os"
 	"sync"
+	"time"
 )
 
 type Pixel struct {
@@ -21,6 +23,8 @@ func Render(sampler Sampler, options RenderingOptions, camera Camera, scene Scen
 
 	inputQueue := make(chan Pixel)
 	outputQueue := make(chan Pixel)
+
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	var wgImageBuilder sync.WaitGroup
 	wgImageBuilder.Add(1)
@@ -60,7 +64,7 @@ func Render(sampler Sampler, options RenderingOptions, camera Camera, scene Scen
 
 	// Spawn workers
 	for i := 0; i < maxThreads; i++ {
-		go worker(sampler, options, camera, scene, inputQueue, outputQueue, &wg)
+		go worker(sampler, options, camera, scene, rnd, inputQueue, outputQueue, &wg)
 	}
 
 	// Enqueue all pixels
@@ -82,14 +86,14 @@ func Render(sampler Sampler, options RenderingOptions, camera Camera, scene Scen
 	writeImage(m)
 }
 
-func worker(sampler Sampler, options RenderingOptions, camera Camera, scene Scene, inputQueue chan Pixel, outputQueue chan Pixel, wg *sync.WaitGroup) {
+func worker(sampler Sampler, options RenderingOptions, camera Camera, scene Scene, rnd *rand.Rand, inputQueue chan Pixel, outputQueue chan Pixel, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for p := range inputQueue {
 		x := p.x
 		y := p.y
 
-		p.color = sampler.Sample(x, y, camera, scene, options)
+		p.color = sampler.Sample(x, y, camera, scene, options, rnd)
 		outputQueue <- p
 	}
 }
