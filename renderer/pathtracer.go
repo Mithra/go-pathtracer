@@ -14,20 +14,17 @@ var randomSource rand.Source = rand.NewSource(time.Now().Unix())
 
 var M_PI float64 = math.Pi
 var M_1_PI float64 = 1. / M_PI
-var nbSamples int = 1
+var nbSamples int = 2
 
 func (r PathTracer) Sample(x, y uint, camera Camera, scene Scene, options RenderingOptions) Vector3 {
 	// See: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays
 	w := float64(options.Width)
 	h := float64(options.Height)
 
-	cam := NewRay(camera.position, camera.direction.Normalize())
+	cam := NewRay(camera.position, camera.direction)
 
 	aspectRatio := w / h
 	scale := math.Tan(0.5 * degToRad(options.Fov))
-
-	cx := NewVector3(scale*aspectRatio, 0, 0)
-	cy := cx.Cross(camera.direction).Normalize().MulScalar(-scale)
 
 	var randomSeed []uint = nil
 
@@ -42,45 +39,26 @@ func (r PathTracer) Sample(x, y uint, camera Camera, scene Scene, options Render
 				r2 := 2. * erand48(randomSeed)
 				dy := ternaryFloat64(r2 < 1, math.Sqrt(r2)-1., 1.-math.Sqrt(2.-r2))
 
-				//dx, dy := 0., 0.
-
-				d := cx.MulScalar(((float64(sx)+.5+dx)/2+float64(x))/w - .5).
-					Add(cy.MulScalar(((float64(sy)+.5+dy)/2+float64(y))/h - .5)).
-					Add(cam.Direction)
-
-				//dx := (erand48(randomSeed) - .5) * 2
-				//dy := (erand48(randomSeed) - .5) * 2
-
-				//dx := 0.
-				//dy := 0.
-
-				// Translate from raster space to screen space
-				// See: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays
-
 				// Normalized Device Coordinates ([0,1])
 				// We add 0.5 because we want to pass through the center of the pixel, not the top left corner
-				// pixelNdcX := ((dx+float64(xOffset))/1 + float64(x) + 0.5) / float64(options.Width)
-				// pixelNdcY := ((dy+float64(yOffset))/1 + float64(y) + 0.5) / float64(options.Height)
+				pixelNdcX := ((dx+float64(sx))/2. + float64(x) + 0.5) / w
+				pixelNdcY := ((dy+float64(sy))/2. + float64(y) + 0.5) / h
 
 				// Screen space ([-1,1])
-				// pixelScreenX := 2*pixelNdcX - 1
-				// pixelScreenY := 1 - 2*pixelNdcY
+				pixelScreenX := 2*pixelNdcX - 1
+				pixelScreenY := 1 - 2*pixelNdcY // We want the Y axis to go UP, not DOWN so we "inverse" it
 
-				// Camera space
-				// pixelCameraX := pixelScreenX * aspectRatio * angle
-				// pixelCameraY := pixelScreenY * angle
+				// Camera space (Applying aspect ratio, scale and camera transform)
+				pixelCameraX := pixelScreenX * aspectRatio * scale
+				pixelCameraY := pixelScreenY * scale
+				pixelCameraSpace := camera.cameraToWorld.MultDirection(NewVector3(pixelCameraX, pixelCameraY, -1)).Normalize()
 
-				// if (x == 0 && y == 0) || (x == options.Width-1 && y == 0) || (x == 0 && y == options.Height-1) || (x == options.Width-1 && y == options.Height-1) {
-				// 	fmt.Printf("Raster: (X=%v; Y=%v) | Ndc: (X=%v; Y=%v) | Screen: (X=%v; Y=%v) | Camera: (X=%v; Y=%v)\n", x, y, pixelNdcX, pixelNdcY, pixelScreenX, pixelScreenY, pixelCameraX, pixelCameraY)
-				// }
-
-				rayPosition := cam.Origin.Add(d.MulScalar(140))
-				rayDirection := d.Normalize()
-
-				radiance := r.radiance(NewRay(rayPosition, rayDirection), scene, options, 0, randomSeed, 1)
+				// Compute color for that pixel
+				radiance := r.radiance(NewRay(cam.Origin, pixelCameraSpace), scene, options, 0, randomSeed, 1)
 				acc = acc.Add(radiance.MulScalar(1. / float64(nbSamples)))
 			}
 
+			// Sum up pixel color
 			pixelColor = pixelColor.Add(NewVector3(clamp(acc.X), clamp(acc.Y), clamp(acc.Z)).MulScalar(.25))
 		}
 	}

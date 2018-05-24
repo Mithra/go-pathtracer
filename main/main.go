@@ -50,7 +50,8 @@ func createCornellBoxScene2() (r.Camera, r.Scene) {
 
 	lights := []r.Light{}
 
-	camera := r.NewCamera(r.NewVector3(50, 52, 295.6), r.NewVector3(0, -0.042612, -1).Normalize())
+	//camera := r.NewCamera(r.NewVector3(50, 52, 295.6), r.NewVector3(0, -0.042612, -1).Normalize())
+	camera := r.NewCamera(r.NewVector3(50, 40.8, 190), r.NewVector3(0, -0.042612, -1).Normalize())
 
 	return camera, r.Scene{Objects: objects, Lights: lights}
 }
