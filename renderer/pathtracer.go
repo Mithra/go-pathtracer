@@ -16,74 +16,83 @@ var M_PI float64 = math.Pi
 var M_1_PI float64 = 1. / M_PI
 var nbSamples int = 1
 
-func (r PathTracer) Sample(x, y uint, scene Scene, options RenderingOptions) Vector3 {
-	var aspectRatio = float64(options.Width) / float64(options.Height)
-	var angle = math.Tan(0.5 * options.Fov * math.Pi / 180.0)
+func (r PathTracer) Sample(x, y uint, camera Camera, scene Scene, options RenderingOptions) Vector3 {
+	// See: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays
+	w := float64(options.Width)
+	h := float64(options.Height)
+
+	cam := NewRay(camera.position, camera.direction.Normalize())
+
+	aspectRatio := w / h
+	scale := math.Tan(0.5 * degToRad(options.Fov))
+
+	cx := NewVector3(scale*aspectRatio, 0, 0)
+	cy := cx.Cross(camera.direction).Normalize().MulScalar(-scale)
 
 	var randomSeed []uint = nil
 
 	pixelColor := NewVector3(0, 0, 0)
-	for yOffset := 0; yOffset < 2; yOffset++ {
-		for xOffset := 0; xOffset < 2; xOffset++ {
+	for sy := 0; sy < 2; sy++ {
+		for sx := 0; sx < 2; sx++ {
 			acc := NewVector3(0, 0, 0)
 			for subSample := 0; subSample < nbSamples; subSample++ {
-				// r1 := 2. * erand48(randomSeed)
-				// r2 := 2. * erand48(randomSeed)
+				r1 := 2. * erand48(randomSeed)
+				dx := ternaryFloat64(r1 < 1, math.Sqrt(r1)-1., 1.-math.Sqrt(2.-r1))
 
-				// dx := ternaryFloat64(r1 < 1, math.Sqrt(r1)-1., 1.-math.Sqrt(2.-r1))
-				// dy := ternaryFloat64(r2 < 1, math.Sqrt(r2)-1., 1.-math.Sqrt(2.-r2))
+				r2 := 2. * erand48(randomSeed)
+				dy := ternaryFloat64(r2 < 1, math.Sqrt(r2)-1., 1.-math.Sqrt(2.-r2))
+
+				//dx, dy := 0., 0.
+
+				d := cx.MulScalar(((float64(sx)+.5+dx)/2+float64(x))/w - .5).
+					Add(cy.MulScalar(((float64(sy)+.5+dy)/2+float64(y))/h - .5)).
+					Add(cam.Direction)
 
 				//dx := (erand48(randomSeed) - .5) * 2
 				//dy := (erand48(randomSeed) - .5) * 2
 
-				dx := 0.
-				dy := 0.
+				//dx := 0.
+				//dy := 0.
 
 				// Translate from raster space to screen space
 				// See: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays
 
 				// Normalized Device Coordinates ([0,1])
 				// We add 0.5 because we want to pass through the center of the pixel, not the top left corner
-				pixelNdcX := ((dx+float64(xOffset))/1 + float64(x) + 0.5) / float64(options.Width)
-				pixelNdcY := ((dy+float64(yOffset))/1 + float64(y) + 0.5) / float64(options.Height)
+				// pixelNdcX := ((dx+float64(xOffset))/1 + float64(x) + 0.5) / float64(options.Width)
+				// pixelNdcY := ((dy+float64(yOffset))/1 + float64(y) + 0.5) / float64(options.Height)
 
 				// Screen space ([-1,1])
-				pixelScreenX := 2*pixelNdcX - 1
-				pixelScreenY := 1 - 2*pixelNdcY
+				// pixelScreenX := 2*pixelNdcX - 1
+				// pixelScreenY := 1 - 2*pixelNdcY
 
 				// Camera space
-				pixelCameraX := pixelScreenX * aspectRatio * angle
-				pixelCameraY := pixelScreenY * angle
+				// pixelCameraX := pixelScreenX * aspectRatio * angle
+				// pixelCameraY := pixelScreenY * angle
 
 				// if (x == 0 && y == 0) || (x == options.Width-1 && y == 0) || (x == 0 && y == options.Height-1) || (x == options.Width-1 && y == options.Height-1) {
 				// 	fmt.Printf("Raster: (X=%v; Y=%v) | Ndc: (X=%v; Y=%v) | Screen: (X=%v; Y=%v) | Camera: (X=%v; Y=%v)\n", x, y, pixelNdcX, pixelNdcY, pixelScreenX, pixelScreenY, pixelCameraX, pixelCameraY)
 				// }
 
-				rayDirection := Vector3{X: pixelCameraX, Y: pixelCameraY, Z: -1}.Normalize()
+				rayPosition := cam.Origin.Add(d.MulScalar(140))
+				rayDirection := d.Normalize()
 
-				ray := Ray{
-					Origin:    Vector3{X: 0, Y: 0, Z: 0},
-					Direction: rayDirection,
-				}
-
-				acc = acc.Add(r.radiance(ray, scene, options, 0, randomSeed, 1).MulScalar(1. / float64(nbSamples)))
+				radiance := r.radiance(NewRay(rayPosition, rayDirection), scene, options, 0, randomSeed, 1)
+				acc = acc.Add(radiance.MulScalar(1. / float64(nbSamples)))
 			}
 
 			pixelColor = pixelColor.Add(NewVector3(clamp(acc.X), clamp(acc.Y), clamp(acc.Z)).MulScalar(.25))
-			// pixelColor.X = gammaCorrection(pixelColor.X)
-			// pixelColor.Y = gammaCorrection(pixelColor.Y)
-			// pixelColor.Z = gammaCorrection(pixelColor.Z)
 		}
 	}
+
+	pixelColor.X = gammaCorrection(pixelColor.X)
+	pixelColor.Y = gammaCorrection(pixelColor.Y)
+	pixelColor.Z = gammaCorrection(pixelColor.Z)
+
 	return pixelColor
 }
 
-func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, depth uint, randomSeed []uint, E float64) Vector3 {
-	depth = depth + 1
-	if depth > options.MaxDepth {
-		return defaultColor
-	}
-
+func (r PathTracer) intersect(ray Ray, scene Scene, ignoreLights bool) (hit Hit, index int) {
 	tnear := math.MaxFloat64
 	collisionIndex := -1
 
@@ -91,6 +100,11 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 
 	// Compute nearest intersection
 	for i := 0; i < len(scene.Objects); i++ {
+		obj := scene.Objects[i]
+		if ignoreLights && obj.Material().EmissionColor != Vector3Zero {
+			continue
+		}
+
 		hit := scene.Objects[i].Intersects(ray)
 		if hit.Valid {
 			if hit.Distance < tnear {
@@ -100,6 +114,20 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 			}
 		}
 	}
+
+	return nearestHit, collisionIndex
+}
+
+func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, depth uint, randomSeed []uint, E float64) Vector3 {
+	depth = depth + 1
+
+	// We don't want to draw the light spheres
+	ignoreLights := false
+	if depth == 1 {
+		ignoreLights = true
+	}
+
+	nearestHit, collisionIndex := r.intersect(ray, scene, ignoreLights)
 
 	if collisionIndex == -1 {
 		return defaultColor
@@ -116,12 +144,9 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 	nhit := nearestHit.Normal
 	nhitCleaned := nhit
 
-	inside := false
-
 	// Inside the sphere
-	if ray.Direction.Dot(nhit) > 0 {
+	if nhit.Dot(ray.Direction) >= 0 {
 		nhitCleaned = nhit.MulScalar(-1)
-		inside = true
 	}
 
 	// Russian Roulette
@@ -165,12 +190,13 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 		e := NewVector3(0, 0, 0)
 
 		for i := 0; i < len(scene.Objects); i++ {
-			if i == collisionIndex || scene.Objects[i].Material().EmissionColor == Vector3Zero {
+			if scene.Objects[i].Material().EmissionColor == Vector3Zero {
 				continue
 			}
 
 			light := scene.Objects[i]
-			lightDistance := phit.DistanceTo(light.Position())
+			lightMaterial := light.Material()
+			//lightDistance := phit.DistanceTo(light.Position())
 
 			sw := light.Position().Sub(phit)
 			su := NewVector3(1, 1, 1)
@@ -181,7 +207,7 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 			sv := sw.Cross(su).Normalize()
 
 			p := phit.Sub(light.Position())
-			rad := 50. // TODO: ?
+			rad := 1.5 // TODO: ?
 
 			cos_a_max := math.Sqrt(1 - (rad*rad)/p.Dot(p))
 			eps1 := erand48(randomSeed)
@@ -197,29 +223,19 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 			lightDirection := l1.Add(l2).Add(l3).Normalize()
 
 			lightRay := NewRay(phit, lightDirection)
-			transmission := true
-			for j := 0; j < len(scene.Objects); j++ {
-				// Ignore self collisions
-				if j == collisionIndex || j == i {
-					continue
-				}
-				lightHit := scene.Objects[j].Intersects(lightRay)
 
-				// Object is blocking the light
-				if lightHit.Valid && lightHit.Distance < lightDistance {
-					transmission = false
-					break
-				}
-			}
+			collision, index := r.intersect(lightRay, scene, false)
 
-			if transmission {
+			// The only collision was the light itself
+			if collision.Valid && index == i {
 				omega := 2 * M_PI * (1 - cos_a_max)
-				e = e.Add(objectColor.Mul(light.Material().EmissionColor.MulScalar(lightDirection.Dot(nhit) * omega)).MulScalar(M_1_PI))
+				e = e.Add(objectColor.Mul(lightMaterial.EmissionColor.MulScalar(lightDirection.Dot(nhitCleaned) * omega)).MulScalar(M_1_PI))
 			}
 		}
 
-		//return e
-		return material.EmissionColor.MulScalar(E).Add(e).Add(objectColor.Mul(r.radiance(NewRay(phit, d), scene, options, depth, randomSeed, 0)))
+		return material.EmissionColor.MulScalar(E).
+			Add(e).
+			Add(objectColor.Mul(r.radiance(NewRay(phit, d), scene, options, depth, randomSeed, 0)))
 	}
 
 	reflectionDirection := ray.Direction.Sub(nhit.MulScalar(2 * nhit.Dot(ray.Direction)))
@@ -227,27 +243,26 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 
 	// Specular reflection
 	if material.Transparency == 0 {
-		return material.EmissionColor.Add(objectColor.Mul(r.radiance(reflectionRay, scene, options, depth, randomSeed, 1)))
+		return material.EmissionColor.
+			Add(objectColor.Mul(r.radiance(reflectionRay, scene, options, depth, randomSeed, 1)))
 	}
 
 	// Reflection + Refraction (dielectric (glass))
+	into := nhit.Dot(nhitCleaned) > 0
 	nc := 1.
 	nt := 1.5
-	nnt := nt / nc
-	if inside {
-		nnt = nc / nt
-	}
-
+	nnt := ternaryFloat64(into, nc/nt, nt/nc)
 	ddn := ray.Direction.Dot(nhitCleaned)
 	cost2t := 1 - nnt*nnt*(1-ddn*ddn)
 
 	// Total internal reflection
 	if cost2t < 0 {
-		return material.EmissionColor.Add(objectColor.Mul(r.radiance(NewRay(phit, reflectionDirection), scene, options, depth, randomSeed, 1)))
+		return material.EmissionColor.
+			Add(objectColor.Mul(r.radiance(reflectionRay, scene, options, depth, randomSeed, 1)))
 	}
 
 	// Choose reflection or refraction
-	coeff := ternaryFloat64(inside, 1, -1)
+	coeff := ternaryFloat64(into, 1, -1)
 
 	tdir1 := ray.Direction.MulScalar(nnt)
 	tdir2 := nhit.MulScalar(coeff * (ddn * nnt * math.Sqrt(cost2t)))
@@ -255,12 +270,12 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 
 	a := nt - nc
 	b := nt + nc
-	c := 1 - ternaryFloat64(inside, -ddn, tdir.Dot(nhit))
+	c := 1 - ternaryFloat64(into, -ddn, tdir.Dot(nhit))
 	R0 := a * a / (b * b)
 	Re := R0 + (1-R0)*c*c*c*c*c
 	Tr := 1 - Re
 	P := .25 + .5*Re
-	Rp := Re / P
+	RP := Re / P
 	TP := Tr / (1 - P)
 
 	// TODO ?
@@ -268,7 +283,7 @@ func (r PathTracer) radiance(ray Ray, scene Scene, options RenderingOptions, dep
 	if depth > 2 {
 		// Russian Roulette
 		if erand48(randomSeed) < P {
-			colorDelta = r.radiance(reflectionRay, scene, options, depth, randomSeed, 1).MulScalar(Rp)
+			colorDelta = r.radiance(reflectionRay, scene, options, depth, randomSeed, 1).MulScalar(RP)
 		} else {
 			colorDelta = r.radiance(NewRay(phit, tdir), scene, options, depth, randomSeed, 1).MulScalar(TP)
 		}

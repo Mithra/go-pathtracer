@@ -6,20 +6,56 @@ import (
 
 func main() {
 	options := r.RenderingOptions{
-		Width:    800,
-		Height:   800,
-		Fov:      60,
+		Width:  800,
+		Height: 600,
+		//Fov:    90,
+		Fov:      54.36,
 		MaxDepth: 5,
 	}
 
 	sampler := r.PathTracer{}
 	//sampler := r.RayTracer{}
 
-	r.Render(sampler, options, createCornellBoxScene())
-	//r.Render(sampler, options, createTestScene1())
+	camera, scene := createCornellBoxScene2()
+
+	r.Render(sampler, options, camera, scene)
 }
 
-func createCornellBoxScene() r.Scene {
+func createCornellBoxScene2() (r.Camera, r.Scene) {
+	lightMaterial := r.NewMaterial(r.Vector3Zero, 0, 0, r.NewVector3(1, 1, 1).MulScalar(400))
+
+	leftWallMaterial := r.NewMaterial(r.NewVector3(.75, .25, .25), 0, 0, r.Vector3Zero)
+	rightWallMaterial := r.NewMaterial(r.NewVector3(.25, .25, .75), 0, 0, r.Vector3Zero)
+	backWallMaterial := r.NewMaterial(r.NewVector3(.75, .75, .75), 0, 0, r.Vector3Zero)
+	frontWallMaterial := r.NewMaterial(r.NewVector3(0, 0, 0), 0, 0, r.Vector3Zero)
+
+	mirrorMaterial := r.NewMaterial(r.NewVector3(.9999, .9999, .9999), 1.0, 0, r.Vector3Zero)
+	glassMaterial := r.NewMaterial(r.NewVector3(.9999, .9999, .9999), 1.0, 0, r.Vector3Zero)
+
+	const radius = 1e5
+
+	objects := []r.Geometry{
+		r.CreateSphere(r.NewVector3(-radius, 40.8, 81.6), radius, leftWallMaterial),  // Left
+		r.CreateSphere(r.NewVector3(1e5+100, 40.8, 81.6), radius, rightWallMaterial), // Right
+		r.CreateSphere(r.NewVector3(50, 40.8, -radius), radius, backWallMaterial),    // Back
+		r.CreateSphere(r.NewVector3(50, 40.8, 1e5+170), radius, frontWallMaterial),   // Front
+		r.CreateSphere(r.NewVector3(50, -radius, -81.6), radius, backWallMaterial),   // Bottom
+		r.CreateSphere(r.NewVector3(50, 1e5+81.6, -81.6), radius, backWallMaterial),  // Top
+
+		r.CreateSphere(r.NewVector3(27, 16.5, 47), 16.5, mirrorMaterial), // Sphere1
+		r.CreateSphere(r.NewVector3(73, 16.5, 78), 16.5, glassMaterial),  // Sphere2
+
+		r.CreateSphere(r.NewVector3(50, 81.6-16.5, 81.6), 1.5, lightMaterial), // Light
+	}
+
+	lights := []r.Light{}
+
+	camera := r.NewCamera(r.NewVector3(50, 52, 295.6), r.NewVector3(0, -0.042612, -1).Normalize())
+
+	return camera, r.Scene{Objects: objects, Lights: lights}
+}
+
+func createCornellBoxScene() (r.Camera, r.Scene) {
 	lightMaterial := r.NewMaterial(r.Vector3Zero, 0, 0, r.NewVector3(1, 1, 1).MulScalar(4))
 	leftWallMaterial := r.NewMaterial(r.NewVector3(.75, .25, .25), 0, 0, r.Vector3Zero)
 	rightWallMaterial := r.NewMaterial(r.NewVector3(.25, .25, .75), 0, 0, r.Vector3Zero)
@@ -52,10 +88,12 @@ func createCornellBoxScene() r.Scene {
 		r.NewLight(r.NewVector3(0, offsetX-10, -offsetZ-150), r.NewVector3(4, 4, 4).MulScalar(0.5)),
 	}
 
-	return r.Scene{Objects: objects, Lights: lights}
+	camera := r.NewCamera(r.NewVector3(0, 0, 0), r.NewVector3(0, 0, -1))
+
+	return camera, r.Scene{Objects: objects, Lights: lights}
 }
 
-func createTestScene1() r.Scene {
+func createTestScene1() (r.Camera, r.Scene) {
 	var objects []r.Geometry
 	var lights []r.Light
 
@@ -89,5 +127,7 @@ func createTestScene1() r.Scene {
 		EmissionColor: r.Vector3{X: 1, Y: 1, Z: 1},
 	})
 
-	return r.Scene{Objects: objects, Lights: lights}
+	camera := r.NewCamera(r.NewVector3(0, 0, 0), r.NewVector3(0, 0, -1))
+
+	return camera, r.Scene{Objects: objects, Lights: lights}
 }

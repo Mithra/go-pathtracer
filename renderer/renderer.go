@@ -5,7 +5,6 @@ import (
 	"image"
 	"image/color"
 	"image/png"
-	"math"
 	"os"
 	"sync"
 )
@@ -17,7 +16,7 @@ type Pixel struct {
 }
 
 // Render computes and write the result as a PNG file
-func Render(sampler Sampler, options RenderingOptions, scene Scene) {
+func Render(sampler Sampler, options RenderingOptions, camera Camera, scene Scene) {
 	const maxThreads = 8
 
 	inputQueue := make(chan Pixel)
@@ -31,14 +30,28 @@ func Render(sampler Sampler, options RenderingOptions, scene Scene) {
 	go func() {
 		defer wgImageBuilder.Done()
 
+		totalPixels := options.Width * options.Height
+		processedPixels := uint(0)
+		progress := uint(0)
+
+		precision := uint(25)
+		reportingStep := uint(float64(totalPixels) * (float64(precision) / 100.))
+
 		for p := range outputQueue {
 			c := color.RGBA{
-				uint8(math.Min(1, p.color.X) * 255),
-				uint8(math.Min(1, p.color.Y) * 255),
-				uint8(math.Min(1, p.color.Z) * 255),
+				uint8(p.color.X),
+				uint8(p.color.Y),
+				uint8(p.color.Z),
 				255,
 			}
 			m.Set(int(p.x), int(p.y), c)
+
+			processedPixels++
+			if processedPixels%reportingStep == 0 {
+				progress++
+				fmt.Printf("%v%% completed\n", progress*precision)
+				writeImage(m)
+			}
 		}
 	}()
 
@@ -47,7 +60,7 @@ func Render(sampler Sampler, options RenderingOptions, scene Scene) {
 
 	// Spawn workers
 	for i := 0; i < maxThreads; i++ {
-		go worker(sampler, options, scene, inputQueue, outputQueue, &wg)
+		go worker(sampler, options, camera, scene, inputQueue, outputQueue, &wg)
 	}
 
 	// Enqueue all pixels
@@ -65,25 +78,29 @@ func Render(sampler Sampler, options RenderingOptions, scene Scene) {
 	// Wait for image to be composed
 	wgImageBuilder.Wait()
 
-	f, err := os.OpenFile("rgb.png", os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer f.Close()
-
 	fmt.Println("Result saved to rgb.png")
-	png.Encode(f, m)
+	writeImage(m)
 }
 
-func worker(sampler Sampler, options RenderingOptions, scene Scene, inputQueue chan Pixel, outputQueue chan Pixel, wg *sync.WaitGroup) {
+func worker(sampler Sampler, options RenderingOptions, camera Camera, scene Scene, inputQueue chan Pixel, outputQueue chan Pixel, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for p := range inputQueue {
 		x := p.x
 		y := p.y
 
-		p.color = sampler.Sample(x, y, scene, options)
+		p.color = sampler.Sample(x, y, camera, scene, options)
 		outputQueue <- p
 	}
+}
+
+func writeImage(m *image.RGBA) {
+	f, err := os.OpenFile("rgb.png", os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	png.Encode(f, m)
+	defer f.Close()
 }
